@@ -7,6 +7,7 @@ import * as web3Utils from 'web3-utils';
 import * as crypto from '@polkadot/util-crypto';
 import { string } from 'prop-types';
 
+import { Json } from '@polkadot/types';
 export default function Main (props) {
   const [status, setStatus] = useState('');
   const [proposal, setProposal] = useState({});
@@ -18,18 +19,20 @@ export default function Main (props) {
   const keyring = new Keyring({ type: 'sr25519' });
 
   // ByteCode of our ERC20 exemple: copied from ./truffle/contracts/MyToken.json
-  const ERC20_BYTECODES = require('./MyToken.json').bytecode;
+  const ERC20_BYTECODES = require('./MyToken.json').object;
+
 
 
   useEffect(() => {
     async function initData () {
-      const { api, alice, bob } = await init();
+      const { api, alice, bob , aliceEvmAccount, BobEvmAccount} = await init();
 
       //step 1: Creating the contract from ALICE
-      const contractAccount = await step1(api, alice);
+      const contractAccount = await step1(api, alice, aliceEvmAccount);
 
+      console.log(contractAccount);
       // step 2: Retrieving Alice and Contract information
-      await step2(api, alice, contractAccount.address);
+      //await step2(api, alice, contractAccount.address);
 
       // step 3: Transfering Smart Contract tokens from Alice to Bob
       //await step3(api, alice, bob, contractAccount.address);
@@ -53,26 +56,29 @@ export default function Main (props) {
     const { nonce, data: balance } = await api.query.system.account(alice.address);
     console.log(`Alice Substrate Account: ${alice.address}`);
     console.log(`Alice Substrate Account (nonce: ${nonce}) balance, free: ${balance.free.toHex()}`);
-  
-    const aliceEvmAccount = `0x${crypto.blake2AsHex(crypto.decodeAddress(alice.address), 256).substring(26)}`;
-  
-    console.log(`Alice EVM Account: ${aliceEvmAccount}`);
+
+    const aliceEvmAccount = `0x${crypto.blake2AsHex(crypto.decodeAddress(alice.address), 256).substring(20)}`;
+    
+    const BobEvmAccount = `0x${crypto.blake2AsHex(crypto.decodeAddress(bob.address), 256).substring(20)}`;
+
+    //console.log(`bytecode: ${JSON.parse(ERC20_BYTECODES).object}`);
+
     //const evmData = (await api.query.evm.accountsCodes(aliceEvmAccount));
     //console.log(`Alice EVM Account (nonce: ${evmData.nonce}) balance: ${evmData.balance.toHex()}`);
   
-    return { api, alice, bob };
+    return { api, alice, bob ,aliceEvmAccount, BobEvmAccount};
   }
 
   // Create the ERC20 contract from ALICE
-async function step1(api, alice) {
+async function step1(api, alice, aliceEvmAccount) {
 
 	console.log(`\nStep 1: Creating Smart Contract`);
 
 	// params: [bytecode, initialBalance, gasLimit, gasPrice],
 	// tx: api.tx.evm.create
 
-	const transaction = await api.tx.evm.create(alice ,ERC20_BYTECODES, 0, 4294967295, 1, null);
-
+	const transaction = await api.tx.evm.create(aliceEvmAccount ,ERC20_BYTECODES, 0, 4294967295, 1, null);
+  console.log(`transaction:${transaction}`);
   const contract = (block, address)  => new Promise (async (resolve, reject)=> {
 
     const unsub = await transaction.signAndSend(alice, (result) => {
@@ -129,7 +135,6 @@ async function step2(api, alice, contractAddress) {
 	console.log(`Alice Contract account storage: ${accountStorage}`);
 	return;
 }
-
   return (
     <Grid.Column width={8}>
       <h1>EVM</h1>
