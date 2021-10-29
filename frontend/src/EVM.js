@@ -5,6 +5,7 @@ import { TxButton } from './substrate-lib/components';
 import { ApiPromise, Keyring } from '@polkadot/api';
 import * as web3Utils from 'web3-utils';
 import * as crypto from '@polkadot/util-crypto';
+import { string } from 'prop-types';
 
 export default function Main (props) {
   const [status, setStatus] = useState('');
@@ -26,10 +27,9 @@ export default function Main (props) {
 
       //step 1: Creating the contract from ALICE
       const contractAccount = await step1(api, alice);
-      console.log(`contract address : ${contractAddress}`);
 
       // step 2: Retrieving Alice and Contract information
-      //await step2(api, alice, contractAccount.address);
+      await step2(api, alice, contractAccount.address);
 
       // step 3: Transfering Smart Contract tokens from Alice to Bob
       //await step3(api, alice, bob, contractAccount.address);
@@ -73,8 +73,9 @@ async function step1(api, alice) {
 
 	const transaction = await api.tx.evm.create(alice ,ERC20_BYTECODES, 0, 4294967295, 1, null);
 
-	const contract = new Promise<{ block: string, address: string }>(async (resolve, reject) => {
-		const unsub = await transaction.signAndSend(alice, (result) => {
+  const contract = (block, address)  => new Promise (async (resolve, reject)=> {
+
+    const unsub = await transaction.signAndSend(alice, (result) => {
 			console.log(`Contract creation is ${result.status}`);
 			if (result.status.isInBlock) {
 				console.log(`Contract included at blockHash ${result.status.asInBlock}`);
@@ -94,8 +95,39 @@ async function step1(api, alice) {
 				});
 			}
 		});
-	});
+
+  });
 	return contract;
+}
+
+
+
+
+
+// Retrieve Alice & Contract Storage
+async function step2(api, alice, contractAddress) {
+
+	console.log(`\nStep 2: Retrieving Contract from evm address: ${contractAddress}`);
+
+	// Retrieve Alice account with new nonce value
+	const { nonce, data: balance } = await api.query.system.account(alice.address);
+	console.log(`Alice Substrate Account (nonce: ${nonce}) balance, free: ${balance.free}`);
+
+	const accountCode = (await api.query.evm.accountCodes(contractAddress)).toString();
+	console.log(`Contract account code: ${accountCode.substring(0, 16)}...${accountCode.substring(accountCode.length - 16)}`);
+
+	// Computing Contract Storage Slot, using slot 0 and alice EVM account
+	const aliceEvmAccount = `0x${crypto.blake2AsHex(crypto.decodeAddress(alice.address), 256).substring(26)}`;
+	const slot = "0";
+	const mapStorageSlot = slot.padStart(64, '0');
+	const mapKey = aliceEvmAccount.toString().substring(2).padStart(64, '0');
+
+	const storageKey = web3Utils.sha3('0x'.concat(mapKey.concat(mapStorageSlot)));
+	console.log(`Alice Contract storage key: ${storageKey}`);
+
+	const accountStorage = (await api.query.evm.accountStorages(contractAddress, storageKey)).toString();
+	console.log(`Alice Contract account storage: ${accountStorage}`);
+	return;
 }
 
   return (
