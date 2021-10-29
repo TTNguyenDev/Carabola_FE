@@ -7,6 +7,7 @@ import * as web3Utils from 'web3-utils';
 import * as crypto from '@polkadot/util-crypto';
 import { string } from 'prop-types';
 
+import { Json } from '@polkadot/types';
 export default function Main (props) {
   const [status, setStatus] = useState('');
   const [proposal, setProposal] = useState({});
@@ -16,16 +17,17 @@ export default function Main (props) {
   const keyring = new Keyring({ type: 'sr25519' });
 
   // ByteCode of our ERC20 exemple: copied from ./truffle/contracts/MyToken.json
-  const ERC20_BYTECODES = require('./MyToken.json').bytecode;
+  const ERC20_BYTECODES = require('./MyToken.json').object;
 
   useEffect(() => {
     async function initData () {
-      const { api, alice, bob } = await init();
+      const { api, alice, bob , aliceEvmAccount, BobEvmAccount} = await init();
 
       // step 1: Creating the contract from ALICE
       const contractAccount = await step1(api, alice);
       console.log(await contractAccount());
 
+      console.log(contractAccount);
       // step 2: Retrieving Alice and Contract information
       await step2(api, alice, contractAccount);
 
